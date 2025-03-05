@@ -3,7 +3,7 @@ services:
     name: rss-generator
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn wsgi:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.9 # Ou a versão desejada
