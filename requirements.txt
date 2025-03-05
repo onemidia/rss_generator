@@ -1,4 +1,9 @@
 Flask
-Werkzeug
-gunicorngit
-app_teste.py
+Flask-WTF
+Flask-SQLAlchemy
+Flask-Migrate
+gunicorn
+requests
+python-dotenv
+psycopg2-binary
+flask_caching
