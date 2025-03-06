@@ -1,29 +1,25 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory, make_response, flash
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
-# Definição da chave secreta para usar flash messages
+# Configurações de upload
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'txt'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Configuração da SECRET_KEY para evitar erro de sessão
 app.secret_key = os.getenv("SECRET_KEY", "minha_chave_secreta")
 
-# Diretório de uploads temporários
-UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "/tmp/uploads")  # No Render, usar /tmp para persistência temporária
-FEED_PATH = os.path.join(UPLOAD_FOLDER, "feed.xml")  # Caminho correto do feed RSS
-
-# Criar a pasta de uploads, se não existir
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-ALLOWED_EXTENSIONS = {'txt'}
-
 def allowed_file(filename):
+    """Verifica se o arquivo tem uma extensão permitida."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def txt_para_rss(arquivo_txt, arquivo_xml, titulo_feed, link_feed, descricao_feed):
-    """Converte um arquivo TXT em um feed RSS"""
+    """Converte um arquivo TXT para um feed RSS."""
     root = ET.Element("rss", version="2.0")
     channel = ET.SubElement(root, "channel")
 
@@ -47,18 +43,19 @@ def txt_para_rss(arquivo_txt, arquivo_xml, titulo_feed, link_feed, descricao_fee
 
     tree = ET.ElementTree(root)
     tree.write(arquivo_xml, encoding="utf-8", xml_declaration=True)
-    print(f"Arquivo RSS gerado em: {arquivo_xml}")
+    print(f"Arquivo RSS gerado em: {os.path.abspath(arquivo_xml)}")
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
+    """Página inicial para upload de arquivos TXT."""
     if request.method == 'POST':
         if 'file' not in request.files:
-            flash("Nenhum arquivo enviado.")
+            flash("Nenhum arquivo enviado!")
             return redirect(request.url)
-
+        
         file = request.files['file']
         if file.filename == '':
-            flash("Nenhum arquivo selecionado.")
+            flash("Nenhum arquivo selecionado!")
             return redirect(request.url)
 
         if file and allowed_file(file.filename):
@@ -66,8 +63,9 @@ def upload_file():
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
 
-            # Gerar o feed RSS
-            txt_para_rss(file_path, FEED_PATH, 'Carnes Nobres', 'https://seusite.com/feed.xml', 'Lista de Carnes Nobres e seus preços.')
+            # Gera o feed RSS atualizado
+            rss_path = os.path.join(app.config['UPLOAD_FOLDER'], 'feed.xml')
+            txt_para_rss(file_path, rss_path, 'Carnes Nobres', 'https://seusite.com/feed', 'Lista de Carnes Nobres e seus preços.')
 
             flash("Arquivo recebido e feed RSS atualizado!")
             return redirect(url_for('upload_file'))
@@ -76,8 +74,12 @@ def upload_file():
 
 @app.route('/feed.xml')
 def serve_rss_feed():
-    """Servir o feed RSS"""
-    return send_from_directory(app.config['UPLOAD_FOLDER'], "feed.xml")
+    """Servir o feed RSS sem cache, mesmo com parâmetros na URL."""
+    response = make_response(send_from_directory(app.config['UPLOAD_FOLDER'], "feed.xml"))
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 if __name__ == '__main__':
-    app.run(debug=False, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))  # Usando a variável de ambiente PORT
+    app.run(debug=False, host="0.0.0.0", port=10000)
