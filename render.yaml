@@ -3,7 +3,9 @@ services:
     name: rss-generator
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn wsgi_teste:app
+    startCommand: gunicorn wsgi:app  # Ou gunicorn app:app, dependendo de qual arquivo está sendo usado
     envVars:
       - key: PYTHON_VERSION
         value: 3.9
+      - key: UPLOAD_FOLDER
+        value: "/tmp/uploads"

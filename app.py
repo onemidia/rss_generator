@@ -1,11 +1,13 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
+
+# Diretório de uploads temporários
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
 ALLOWED_EXTENSIONS = {'txt'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -37,23 +39,33 @@ def txt_para_rss(arquivo_txt, arquivo_xml, titulo_feed, link_feed, descricao_fee
 
     tree = ET.ElementTree(root)
     tree.write(arquivo_xml, encoding="utf-8", xml_declaration=True)
-    print(f"Arquivo RSS gerado em: {os.path.abspath(arquivo_xml)}") # Adicionado print
+    print(f"Arquivo RSS gerado em: {os.path.abspath(arquivo_xml)}")  # Adicionado print
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
         if 'file' not in request.files:
+            flash("Nenhum arquivo enviado.")
             return redirect(request.url)
+
         file = request.files['file']
         if file.filename == '':
+            flash("Nenhum arquivo selecionado.")
             return redirect(request.url)
+
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
             txt_para_rss(file_path, 'feed.xml', 'Carnes Nobres', 'https://seusite.com/feed', 'Lista de Carnes Nobres e seus preços.')
-            return 'Arquivo TXT recebido e feed RSS atualizado!'
+            flash("Arquivo recebido e feed RSS atualizado!")
+            return redirect(url_for('upload_file'))
+
     return render_template('index.html')
 
+@app.route('/feed.xml')
+def serve_rss_feed():
+    return send_from_directory(app.config['UPLOAD_FOLDER'], 'feed.xml')
+
 if __name__ == '__main__':
-    app.run(debug=False, host="0.0.0.0", port=10000)
+    app.run(debug=False, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))  # Usando a variável de ambiente PORT
