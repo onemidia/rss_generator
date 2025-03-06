@@ -37,6 +37,7 @@ def txt_para_rss(arquivo_txt, arquivo_xml, titulo_feed, link_feed, descricao_fee
 
     tree = ET.ElementTree(root)
     tree.write(arquivo_xml, encoding="utf-8", xml_declaration=True)
+    print(f"Arquivo RSS gerado em: {os.path.abspath(arquivo_xml)}") # Adicionado print
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
