@@ -6,16 +6,24 @@ import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
+# Definição da chave secreta para usar flash messages
+app.secret_key = os.getenv("SECRET_KEY", "minha_chave_secreta")
+
 # Diretório de uploads temporários
-UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
-ALLOWED_EXTENSIONS = {'txt'}
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "/tmp/uploads")  # No Render, usar /tmp para persistência temporária
+FEED_PATH = os.path.join(UPLOAD_FOLDER, "feed.xml")  # Caminho correto do feed RSS
+
+# Criar a pasta de uploads, se não existir
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+ALLOWED_EXTENSIONS = {'txt'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def txt_para_rss(arquivo_txt, arquivo_xml, titulo_feed, link_feed, descricao_feed):
-    """(Código de conversão txt para rss, como antes)"""
+    """Converte um arquivo TXT em um feed RSS"""
     root = ET.Element("rss", version="2.0")
     channel = ET.SubElement(root, "channel")
 
@@ -39,7 +47,7 @@ def txt_para_rss(arquivo_txt, arquivo_xml, titulo_feed, link_feed, descricao_fee
 
     tree = ET.ElementTree(root)
     tree.write(arquivo_xml, encoding="utf-8", xml_declaration=True)
-    print(f"Arquivo RSS gerado em: {os.path.abspath(arquivo_xml)}")  # Adicionado print
+    print(f"Arquivo RSS gerado em: {arquivo_xml}")
 
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
@@ -57,7 +65,10 @@ def upload_file():
             filename = secure_filename(file.filename)
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(file_path)
-            txt_para_rss(file_path, 'feed.xml', 'Carnes Nobres', 'https://seusite.com/feed', 'Lista de Carnes Nobres e seus preços.')
+
+            # Gerar o feed RSS
+            txt_para_rss(file_path, FEED_PATH, 'Carnes Nobres', 'https://seusite.com/feed.xml', 'Lista de Carnes Nobres e seus preços.')
+
             flash("Arquivo recebido e feed RSS atualizado!")
             return redirect(url_for('upload_file'))
 
@@ -65,7 +76,8 @@ def upload_file():
 
 @app.route('/feed.xml')
 def serve_rss_feed():
-    return send_from_directory(app.config['UPLOAD_FOLDER'], 'feed.xml')
+    """Servir o feed RSS"""
+    return send_from_directory(app.config['UPLOAD_FOLDER'], "feed.xml")
 
 if __name__ == '__main__':
     app.run(debug=False, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))  # Usando a variável de ambiente PORT
